@@ -1,33 +1,83 @@
-<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
     <id>com.aymaneelmaini.flyway-version-tracker</id>
+    <name>Flyway Version Tracker</name>
+    <vendor url="https://github.com/aymaneelmaini">Aymane El Maini</vendor>
 
-    <!-- Public plugin name should be written in Title Case.
-     Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
-    <name>Flyway-version-tracker</name>
-
-    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
-
-    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
-         Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        Enter short description for your plugin here.<br>
-        <em>most HTML tags may be used</em>
-        ]]></description>
+        Prevents Flyway migration version conflicts by checking local and remote branches.<br/>
+        <ul>
+            <li>Auto-suggests the next safe migration version when creating a new file</li>
+            <li>Blocks commits that introduce duplicate migration versions</li>
+            <li>Warns in the push dialog if local migrations conflict with the remote branch</li>
+            <li>Sidebar panel showing local vs remote migrations with conflict highlights</li>
+        </ul>
+        <b>Usage:</b> Right-click your migrations folder → <i>Mark as Migrations Root</i>, then configure the sync branch via <i>Tools → Flyway Tracker → Configure Sync Branch</i>.
+    ]]></description>
 
-    <!-- Product and plugin compatibility requirements.
-         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
 
-    <resource-bundle>messages.MyMessageBundle</resource-bundle>
-
-    <!-- Extensions defined by the plugin.
-         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="MyToolWindow" factoryClass="com.aymaneelmaini.MyToolWindowFactory"
-                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>
+
+        <notificationGroup id="Flyway Version Tracker"
+                           displayType="BALLOON"/>
+
+        <projectService serviceImplementation="com.aymaneelmaini.flywaytracker.settings.ProjectSettings"/>
+        <projectService serviceImplementation="com.aymaneelmaini.flywaytracker.services.FlywayMigrationService"/>
+
+        <toolWindow id="Flyway Tracker"
+                    anchor="right"
+                    factoryClass="com.aymaneelmaini.flywaytracker.toolwindow.MigrationTrackerToolWindowFactory"
+                    icon="AllIcons.Toolwindows.ToolWindowDatabase"/>
+
+        <checkinHandlerFactory implementation="com.aymaneelmaini.flywaytracker.checkin.MigrationVersionCheckinHandlerFactory"/>
+
+
     </extensions>
+
+    <actions>
+
+        <!-- New Migration: appears under New File menu -->
+        <action id="flyway.tracker.createMigration"
+                class="com.aymaneelmaini.flywaytracker.actions.CreateMigrationAction"
+                text="New Migration"
+                description="Create a new Flyway migration file with auto-suggested version">
+            <add-to-group group-id="NewGroup" anchor="after" relative-to-action="NewFile"/>
+        </action>
+
+        <!-- Mark / unmark migration root: appears in directory context menu -->
+        <action id="flyway.tracker.markAsRoot"
+                class="com.aymaneelmaini.flywaytracker.actions.MarkAsMigrationRootAction"
+                text="Migrations Root"
+                description="Mark this directory as the Flyway migrations root">
+            <add-to-group group-id="MarkRootGroup" anchor="last"/>
+        </action>
+
+        <action id="flyway.tracker.unmarkRoot"
+                class="com.aymaneelmaini.flywaytracker.actions.UnMarkAsMigrationRootAction"
+                text="Unmark as Migrations Root"
+                description="Remove migrations root designation from this directory">
+            <add-to-group group-id="MarkRootGroup" anchor="last"/>
+        </action>
+
+        <!-- Tools menu group -->
+        <group id="flyway.tracker.toolsGroup"
+               text="Flyway Tracker"
+               description="Flyway Version Tracker actions"
+               popup="true">
+
+            <action id="flyway.tracker.configureBranch"
+                    class="com.aymaneelmaini.flywaytracker.actions.ConfigureSyncBranchAction"
+                    text="Configure Sync Branch"
+                    description="Select the remote branch to check for migration version conflicts"/>
+
+            <action id="flyway.tracker.refresh"
+                    class="com.aymaneelmaini.flywaytracker.actions.RefreshMigrationsAction"
+                    text="Refresh Migrations"
+                    description="Fetch remote and reload migration data"/>
+
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </group>
+
+    </actions>
 
 </idea-plugin>

@@ -15,7 +15,6 @@ dependencies {
         intellijIdea("2025.3.5")
         testFramework(TestFrameworkType.Platform)
 
-        // Add plugin dependencies for compilation here, for example:
-        // bundledPlugin("com.intellij.java")
+
     }
 }
