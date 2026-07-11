@@ -1,164 +1,130 @@
-# Flyway-version-tracker
+# Flyway Version Tracker
 
-[![Twitter Follow](https://img.shields.io/badge/follow-%40JBPlatform-1DA1F2?logo=twitter)](https://twitter.com/JBPlatform)
-[![Developers Forum](https://img.shields.io/badge/JetBrains%20Platform-Join-blue)][jb:forum]
+An IntelliJ IDEA plugin that prevents Flyway migration version conflicts across all active remote branches.
 
-## Connect repository to GitHub
+---
 
-1. [Create a new repository](https://github.com/new) on GitHub.
-2. Run the following commands to initialize and push this project to the repository created in step 1:
+## What it does
 
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/<username>/<repository>.git
-git push -u origin main
+- **Auto-suggests the next safe version** when creating a new migration file (e.g. if `V3__` is the latest, it pre-fills `V4__`)
+- **Blocks commits** that would introduce a duplicate migration version already present on any active remote branch
+- **Auto-detects migration roots** on project open — works out of the box in monorepos with multiple microservices
+- **Sidebar panel** shows per-root migration state and highlights conflicts
+
+---
+
+## Getting started
+
+### 1. Open a project
+
+On project open the plugin automatically:
+
+1. Runs `git fetch` to refresh remote state
+2. Scans for Flyway migration files across all tracked paths
+3. Registers every discovered migration directory as a **migration root**
+
+You will see a balloon notification: `Flyway Tracker: auto-detected N migration root(s)`.
+
+If auto-detection misses a directory (uncommon), see [Manual configuration](#manual-configuration) below.
+
+### 2. Create a new migration
+
+Right-click any directory inside a migration root in the Project panel:
+
+**New → New Migration**
+
+A dialog appears with the version field pre-filled to the next safe version across all active branches:
+
+```
+Version:     V4__          ← auto-filled, edit if needed
+Description: add_payment_table
+Extension:   sql
 ```
 
-3. Configure publishing [secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets) in the GitHub
-   repository settings:
+Click **OK** — the file is created and opened in the editor.
 
-| Secret                 | Description                                                                                                |
-|------------------------|------------------------------------------------------------------------------------------------------------|
-| `PUBLISH_TOKEN`        | JetBrains Marketplace token — [generate here](https://plugins.jetbrains.com/author/me/tokens)              |
-| `CERTIFICATE_CHAIN`    | Plugin signing certificate chain ([docs](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html)) |
-| `PRIVATE_KEY`          | Plugin signing private key                                                                                 |
-| `PRIVATE_KEY_PASSWORD` | Password for the private key                                                                               |
+> The plugin checks local files **and** all remote branches that had activity in the last 30 days. It will not suggest a version that is already in use anywhere.
 
-## Plugin structure
+### 3. Commit protection
 
-A generated project contains the following content structure:
+When you commit (via the IntelliJ commit dialog), the plugin scans staged files. If any staged migration version conflicts with a version already on a remote branch, the commit is blocked:
 
 ```
-.
-├── .github/                GitHub Workflows, issue templates, and Dependabot configuration
-├── .run/                   Predefined Run/Debug Configurations
-├── build/                  Output build directory
-├── gradle
-│   ├── wrapper/            Gradle Wrapper
-│   ├── libs.versions.toml  Version catalog
-├── src                     Plugin sources
-│   ├── main
-│   │   ├── kotlin/         Kotlin production sources
-│   │   └── resources/      Resources - plugin.xml, icons, messages
-├── .gitignore              Git ignoring rules
-├── build.gradle.kts        Gradle build configuration
-├── gradle.properties       Gradle configuration properties
-├── gradlew                 *nix Gradle Wrapper script
-├── gradlew.bat             Windows Gradle Wrapper script
-├── README.md               README
-└── settings.gradle.kts     Gradle project settings
+⚠ Migration conflict detected
+
+  V4__add_users.sql conflicts with origin/feature-xyz
+
+Suggested next version: V5__
+
+[Abort Commit]  [Proceed Anyway]
 ```
 
-In addition to the configuration files, the most crucial part is the `src` directory, which contains our implementation
-and the manifest for our plugin – [plugin.xml][file:plugin.xml].
+Click **Abort Commit** to rename your file, or **Proceed Anyway** if you are intentionally replacing a remote migration.
 
-> [!NOTE]
-> To use Java in your plugin, create the `/src/main/java` directory.
+### 4. Sidebar panel
 
-## Plugin configuration file
+Open **View → Tool Windows → Flyway Tracker** (or click the icon in the right sidebar).
 
-The plugin configuration file is a [plugin.xml][file:plugin.xml] file located in the `src/main/resources/META-INF`
-directory.
-It provides general information about the plugin, its dependencies, extensions, and listeners.
+The panel shows one section per migration root:
 
-You can read more about this file in the [Plugin Configuration File][docs:plugin.xml] section of our documentation.
+```
+user-service  —  next: V5__  ⚠ 1 conflict(s)
+  Path: services/user-service/src/main/resources/db/migration
+  V1__ init_schema.sql
+  V2__ add_users.sql
+  V3__ add_roles.sql
+  V4__ add_payment.sql  ⚠ conflict
+```
 
-If you're still not quite sure what this is all about, read [Introduction to IntelliJ Platform][docs:intro].
+Click **⟳ Refresh** to re-run `git fetch` and reload.
 
-## Predefined Run/Debug configurations
+---
 
-Within the default project structure, there is a `.run` directory provided containing predefined *Run/Debug
-configurations* that expose corresponding Gradle tasks:
+## Manual configuration
 
-| Configuration name | Description                                                                                                                                                                         |
-|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Run Plugin         | Runs [`:runIde`][gh:intellij-platform-gradle-plugin-runIde] IntelliJ Platform Gradle Plugin task. Use the *Debug* icon for plugin debugging.                                        |
-| Run Tests          | Runs [`:check`][gradle:lifecycle-tasks] Gradle task.                                                                                                                                |
-| Run Verifications  | Runs [`:verifyPlugin`][gh:intellij-platform-gradle-plugin-verifyPlugin] IntelliJ Platform Gradle Plugin task to check the plugin compatibility against the specified IntelliJ IDEs. |
+### Mark / unmark a migration root
 
-> [!NOTE]
-> You can find the logs from the running task in the `idea.log` tab.
+If auto-detection missed a directory:
 
-## Publishing the plugin
+1. Right-click the directory in the Project panel
+2. **Mark Directory As → Migrations Root**
 
-> [!TIP]
-> Make sure to follow all guidelines listed in [Publishing a Plugin][docs:publishing] to follow all recommended and
-> required steps.
+To remove it: right-click → **Unmark as Migrations Root**.
 
-Releasing a plugin to [JetBrains Marketplace](https://plugins.jetbrains.com) is a straightforward operation that uses
-the `publishPlugin` Gradle task provided by
-the [intellij-platform-gradle-plugin][gh:intellij-platform-gradle-plugin-docs].
+### Pin to a specific branch
 
-You can also upload the plugin to the [JetBrains Plugin Repository](https://plugins.jetbrains.com/plugin/upload)
-manually via UI.
+By default the plugin checks **all remote branches active in the last 30 days**. To limit checks to one branch:
 
-## GitHub Integration
+**Tools → Flyway Tracker → Configure Sync Branch**
 
-### GitHub Actions
+Select a branch from the list. Leave it empty to revert to checking all active branches.
 
-The project includes [GitHub Actions][https://docs.github.com/en/actions] workflows for automated CI/CD:
+### Refresh manually
 
-| Workflow                                 | Trigger        | Description                                                     |
-|------------------------------------------|----------------|-----------------------------------------------------------------|
-| [Build](.github/workflows/build.yml)     | Push / PR      | Builds, tests, and verifies the plugin; creates a draft release |
-| [Release](.github/workflows/release.yml) | GitHub Release | Publishes the plugin to JetBrains Marketplace                   |
+**Tools → Flyway Tracker → Refresh Migrations** re-fetches remote state and reloads the sidebar.
 
-### GitHub issue templates
+---
 
-The project includes GitHub issue templates:
+## How active branches are determined
 
-- [Bug Report](.github/ISSUE_TEMPLATE/bug-report.yml)
-- [Feature Request](.github/ISSUE_TEMPLATE/feature-request.yml)
+A branch is considered active if its last commit was within the past **30 days**. This is evaluated via:
 
-See [Syntax for issue forms](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms).
+```
+git for-each-ref refs/remotes/ --format=%(refname:short)|%(committerdate:unix)
+```
 
-### Dependabot
+Stale branches are ignored automatically — no configuration needed.
 
-[Dependabot configuration](.github/dependabot.yml) file enables tracking outdated or vulnerable dependencies.
+---
 
-## Useful links
+## Monorepo support
 
-- [IntelliJ Platform SDK Plugin SDK][docs]
-- [IntelliJ Platform Gradle Plugin Documentation][gh:intellij-platform-gradle-plugin-docs]
-- [IntelliJ Platform Explorer][jb:ipe]
-- [JetBrains Marketplace Quality Guidelines][jb:quality-guidelines]
-- [IntelliJ Platform UI Guidelines][jb:ui-guidelines]
-- [JetBrains Marketplace Paid Plugins][jb:paid-plugins]
-- [IntelliJ SDK Code Samples][gh:code-samples]
+Each migration root is tracked independently. If your project has multiple microservices with separate migration directories, each will appear as its own section in the sidebar with its own version sequence and conflict state.
 
-[docs]: https://plugins.jetbrains.com/docs/intellij
+```
+order-service  —  next: V3__
+payment-service  —  next: V7__  ⚠ 1 conflict(s)
+user-service  —  next: V5__
+```
 
-[docs:intro]: https://plugins.jetbrains.com/docs/intellij/intellij-platform.html?from=IJPluginTemplate
-
-[docs:plugin.xml]: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html?from=IJPluginTemplate
-
-[docs:publishing]: https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate
-
-[file:plugin.xml]: ./src/main/resources/META-INF/plugin.xml
-
-[gh:code-samples]: https://github.com/JetBrains/intellij-sdk-code-samples
-
-[gh:intellij-platform-gradle-plugin]: https://github.com/JetBrains/intellij-platform-gradle-plugin
-
-[gh:intellij-platform-gradle-plugin-docs]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
-
-[gh:intellij-platform-gradle-plugin-runIde]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-tasks.html#runIde
-
-[gh:intellij-platform-gradle-plugin-verifyPlugin]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-tasks.html#verifyPlugin
-
-[gradle:lifecycle-tasks]: https://docs.gradle.org/current/userguide/java_plugin.html#lifecycle_tasks
-
-[jb:github]: https://github.com/JetBrains/.github/blob/main/profile/README.md
-
-[jb:forum]: https://platform.jetbrains.com/
-
-[jb:quality-guidelines]: https://plugins.jetbrains.com/docs/marketplace/quality-guidelines.html
-
-[jb:paid-plugins]: https://plugins.jetbrains.com/docs/marketplace/paid-plugins-marketplace.html
-
-[jb:ipe]: https://jb.gg/ipe
-
-[jb:ui-guidelines]: https://jetbrains.github.io/ui
+Settings are stored per-project in `.idea/flyway-tracker.xml` (committed to git).
