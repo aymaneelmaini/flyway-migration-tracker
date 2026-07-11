@@ -10,10 +10,10 @@ import com.intellij.openapi.project.Project
 @Service(Service.Level.PROJECT)
 class ProjectSettings : PersistentStateComponent<ProjectSettings.State> {
 
-    data class State(
-        var migrationRootPath: String = "",
-        var syncBranch: String = ""
-    )
+    class State {
+        @JvmField var migrationRootPaths: MutableList<String> = mutableListOf()
+        @JvmField var syncBranch: String = ""
+    }
 
     private var myState = State()
 
@@ -23,16 +23,26 @@ class ProjectSettings : PersistentStateComponent<ProjectSettings.State> {
         myState = state
     }
 
-    var migrationRootPath: String
-        get() = myState.migrationRootPath
-        set(value) { myState.migrationRootPath = value }
+    var migrationRootPaths: MutableList<String>
+        get() = myState.migrationRootPaths
+        set(value) { myState.migrationRootPaths = value }
 
     var syncBranch: String
         get() = myState.syncBranch
         set(value) { myState.syncBranch = value }
 
     val isConfigured: Boolean
-        get() = migrationRootPath.isNotBlank()
+        get() = migrationRootPaths.isNotEmpty()
+
+    fun addRoot(path: String) {
+        if (path.isNotBlank() && !migrationRootPaths.contains(path)) {
+            migrationRootPaths.add(path)
+        }
+    }
+
+    fun removeRoot(path: String) {
+        migrationRootPaths.remove(path)
+    }
 
     companion object {
         fun getInstance(project: Project): ProjectSettings =

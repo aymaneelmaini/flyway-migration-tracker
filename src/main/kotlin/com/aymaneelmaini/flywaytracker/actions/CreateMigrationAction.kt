@@ -14,11 +14,11 @@ class CreateMigrationAction : AnAction() {
 
     override fun update(e: AnActionEvent) {
         val project = e.project ?: run { e.presentation.isEnabledAndVisible = false; return }
-        val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
-        val root = ProjectSettings.getInstance(project).migrationRootPath
-        e.presentation.isEnabledAndVisible = root.isNotBlank()
-            && file != null
-            && (file.isDirectory && file.path.contains(root) || !file.isDirectory && file.parent?.path?.contains(root) == true)
+        val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: run { e.presentation.isEnabledAndVisible = false; return }
+        val service = FlywayMigrationService.getInstance(project)
+        val filePath = if (file.isDirectory) file.path else file.parent?.path ?: ""
+        e.presentation.isEnabledAndVisible = ProjectSettings.getInstance(project).isConfigured
+            && service.findRootFor(filePath) != null
     }
 
     override fun actionPerformed(e: AnActionEvent) {
@@ -26,12 +26,18 @@ class CreateMigrationAction : AnAction() {
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
         val service = FlywayMigrationService.getInstance(project)
 
-        val nextVersion = service.getNextVersion()
+        val filePath = if (file.isDirectory) file.path else file.parent?.path ?: ""
+        val root = service.findRootFor(filePath) ?: run {
+            Messages.showErrorDialog(project, "Current directory is not inside a configured migration root.", "Flyway Tracker")
+            return
+        }
+
+        val nextVersion = service.getNextVersion(root)
         val suggested = "${nextVersion}describe_your_migration.sql"
 
         val input = Messages.showInputDialog(
             project,
-            "Enter migration file name:\n(Next suggested version: $nextVersion)",
+            "Migration root: $root\nNext suggested version: $nextVersion",
             "New Flyway Migration",
             null,
             suggested,
@@ -42,17 +48,16 @@ class CreateMigrationAction : AnAction() {
         if (migration == null) {
             Messages.showErrorDialog(
                 project,
-                "Invalid migration name: '$input'\nExpected format: V<version>__<description>.<ext>\nExample: V3__add_users_table.sql",
+                "Invalid migration name: '$input'\nExpected: V<version>__<description>.<ext>  (e.g. V3__add_users.sql)",
                 "Invalid Migration Name"
             )
             return
         }
 
-        if (service.isVersionUsed(migration.version, migration.prefix)) {
-            val next = service.getNextVersion()
+        if (service.isVersionUsed(migration.version, root, migration.prefix)) {
             Messages.showErrorDialog(
                 project,
-                "${migration.prefix}${migration.version}__ is already in use locally or on the sync branch.\n\nNext available version: $next",
+                "${migration.prefix}${migration.version}__ already used in $root.\nNext available: ${service.getNextVersion(root)}",
                 "Migration Version Conflict"
             )
             return

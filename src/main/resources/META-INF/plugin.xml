@@ -29,6 +29,8 @@
                     factoryClass="com.aymaneelmaini.flywaytracker.toolwindow.MigrationTrackerToolWindowFactory"
                     icon="AllIcons.Toolwindows.ToolWindowDatabase"/>
 
+        <projectActivity implementation="com.aymaneelmaini.flywaytracker.startup.FlywayTrackerStartupActivity"/>
+
         <checkinHandlerFactory implementation="com.aymaneelmaini.flywaytracker.checkin.MigrationVersionCheckinHandlerFactory"/>
 
 

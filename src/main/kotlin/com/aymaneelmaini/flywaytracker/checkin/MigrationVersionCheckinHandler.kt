@@ -26,25 +26,30 @@ class MigrationVersionCheckinHandler(
     ): ReturnResult {
         val project = panel.project
         val settings = ProjectSettings.getInstance(project)
-
-        if (!settings.isConfigured || settings.syncBranch.isBlank()) return ReturnResult.COMMIT
+        if (!settings.isConfigured) return ReturnResult.COMMIT
 
         val service = FlywayMigrationService.getInstance(project)
-        val root = settings.migrationRootPath
 
-        val conflicting = panel.virtualFiles
-            .filter { it.path.contains(root) }
-            .mapNotNull { FlywayMigrationFile.from(it.name) }
-            .filter { m -> service.isVersionUsedOnRemote(m.version, m.prefix) }
+        // Group staged migration files by their root, then check each root independently
+        data class Conflict(val migration: FlywayMigrationFile, val root: String)
 
-        if (conflicting.isEmpty()) return ReturnResult.COMMIT
+        val conflicts = panel.virtualFiles.mapNotNull { vFile ->
+            val root = service.findRootFor(vFile.path) ?: return@mapNotNull null
+            val migration = FlywayMigrationFile.from(vFile.name) ?: return@mapNotNull null
+            if (service.isVersionUsedOnRemote(migration.version, root, migration.prefix))
+                Conflict(migration, root)
+            else null
+        }
 
-        val nextSuggestion = service.getNextVersion()
-        val list = conflicting.joinToString("\n") { "  • ${it.rawFileName}" }
+        if (conflicts.isEmpty()) return ReturnResult.COMMIT
+
+        val list = conflicts.joinToString("\n") { "  • [${it.root.substringAfterLast('/')}] ${it.migration.rawFileName}" }
+        val suggestions = conflicts.distinctBy { it.root }
+            .joinToString("\n") { "  ${it.root.substringAfterLast('/')}: ${service.getNextVersion(it.root)}" }
 
         val choice = Messages.showYesNoDialog(
             project,
-            "The following migration(s) conflict with branch '${settings.syncBranch}':\n\n$list\n\nNext safe version: $nextSuggestion\n\nAbort the commit to fix the version?",
+            "The following migration(s) conflict with active remote branches:\n\n$list\n\nNext safe versions:\n$suggestions\n\nAbort the commit to fix?",
             "Migration Version Conflict",
             "Abort Commit",
             "Proceed Anyway",

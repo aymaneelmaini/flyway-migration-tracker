@@ -16,12 +16,12 @@ class ConfigureSyncBranchAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val service = FlywayMigrationService.getInstance(project)
-        val branches = service.getRemoteBranches()
+        val branches = service.getActiveBranches()
 
         if (branches.isEmpty()) {
             Messages.showErrorDialog(
                 project,
-                "No remote branches found. Ensure the project has a git remote configured and try running 'Refresh Migrations' first.",
+                "No active remote branches found (updated within last 30 days).\nEnsure the project has a git remote and try 'Refresh Migrations' first.",
                 "Flyway Tracker"
             )
             return

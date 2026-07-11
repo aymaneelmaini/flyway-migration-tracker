@@ -8,14 +8,20 @@ import com.aymaneelmaini.flywaytracker.utils.TerminalClient
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 
+private const val ACTIVE_BRANCH_DAYS = 30L
+private val EXCLUDED_DIRS = setOf("build", "target", ".gradle", ".idea", "node_modules", ".git", "out", "dist")
+private val DEFAULT_BRANCH_CANDIDATES = listOf("origin/main", "origin/master", "origin/develop", "origin/dev")
+private val MIGRATION_FILE_REGEX = Regex(".+/[VUR]\\d[^/]*__[^/]+\\.[a-zA-Z]+$")
+
 @Service(Service.Level.PROJECT)
 class FlywayMigrationService(private val project: Project) {
 
     private val settings get() = ProjectSettings.getInstance(project)
     private val terminal get() = TerminalClient(project.basePath ?: "")
 
-    fun getLocalMigrations(): List<FlywayMigrationFile> {
-        val root = settings.migrationRootPath.ifBlank { return emptyList() }
+    // ── per-root queries ──────────────────────────────────────────────────────
+
+    fun getLocalMigrations(root: String): List<FlywayMigrationFile> {
         val tracked = terminal.exec("git", "ls-files", root)
         val untracked = terminal.exec("git", "ls-files", "-o", "--exclude-standard", root)
         return (tracked + untracked)
@@ -23,19 +29,22 @@ class FlywayMigrationService(private val project: Project) {
             .distinctBy { "${it.prefix}${it.version}" }
     }
 
-    fun getRemoteMigrations(): List<FlywayMigrationFile> {
-        val branch = settings.syncBranch.ifBlank { return emptyList() }
-        val root = settings.migrationRootPath.ifBlank { return emptyList() }
-        return terminal.exec("git", "ls-tree", "-r", "--name-only", branch, root)
-            .mapNotNull { FlywayMigrationFile.from(it) }
+    fun getRemoteMigrations(root: String): List<FlywayMigrationFile> {
+        val branches = if (settings.syncBranch.isNotBlank()) listOf(settings.syncBranch) else getActiveBranches()
+        return branches
+            .flatMap { branch ->
+                terminal.exec("git", "ls-tree", "-r", "--name-only", branch, root)
+                    .mapNotNull { FlywayMigrationFile.from(it) }
+            }
+            .distinctBy { "${it.prefix}${it.version}" }
     }
 
-    fun getAllMigrations(): List<FlywayMigrationFile> =
-        (getLocalMigrations() + getRemoteMigrations())
+    fun getAllMigrations(root: String): List<FlywayMigrationFile> =
+        (getLocalMigrations(root) + getRemoteMigrations(root))
             .distinctBy { "${it.prefix}${it.version}" }
 
-    fun getNextVersion(): String {
-        val versioned = getAllMigrations().filter { it.prefix == 'V' }
+    fun getNextVersion(root: String): String {
+        val versioned = getAllMigrations(root).filter { it.prefix == 'V' }
         if (versioned.isEmpty()) return "V1__"
         val max = versioned.maxWithOrNull { a, b ->
             MigrationVersionComparator.compare(a.version, b.version)
@@ -43,14 +52,57 @@ class FlywayMigrationService(private val project: Project) {
         return "V${max.next()}__"
     }
 
-    fun isVersionUsed(version: MigrationVersion, prefix: Char = 'V'): Boolean =
-        getAllMigrations().any { it.prefix == prefix && it.version == version }
+    fun isVersionUsed(version: MigrationVersion, root: String, prefix: Char = 'V'): Boolean =
+        getAllMigrations(root).any { it.prefix == prefix && it.version == version }
 
-    fun isVersionUsedOnRemote(version: MigrationVersion, prefix: Char = 'V'): Boolean =
-        getRemoteMigrations().any { it.prefix == prefix && it.version == version }
+    fun isVersionUsedOnRemote(version: MigrationVersion, root: String, prefix: Char = 'V'): Boolean =
+        getRemoteMigrations(root).any { it.prefix == prefix && it.version == version }
 
-    fun getRemoteBranches(): List<String> =
-        terminal.exec("git", "branch", "-r", "--format=%(refname:short)")
+    // ── multi-root helpers ────────────────────────────────────────────────────
+
+    /** Returns which configured root a file path belongs to, or null if none. */
+    fun findRootFor(filePath: String): String? {
+        val normalized = filePath.replace("\\", "/")
+        return settings.migrationRootPaths.firstOrNull { root ->
+            normalized.contains(root.replace("\\", "/"))
+        }
+    }
+
+    // ── discovery ─────────────────────────────────────────────────────────────
+
+    /** Scan git-tracked files for all directories containing Flyway migrations,
+     *  excluding build output directories. Returns project-relative paths. */
+    fun detectMigrationRoots(): List<String> {
+        return terminal.exec("git", "ls-files")
+            .filter { path -> MIGRATION_FILE_REGEX.matches("/$path") }
+            .filter { path -> EXCLUDED_DIRS.none { exc -> path.split("/").contains(exc) } }
+            .map { it.substringBeforeLast("/") }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+
+    /** Only branches with commits within the last [withinDays] days. */
+    fun getActiveBranches(withinDays: Long = ACTIVE_BRANCH_DAYS): List<String> {
+        val cutoff = (System.currentTimeMillis() / 1000L) - (withinDays * 86_400L)
+        return terminal.exec(
+            "git", "for-each-ref",
+            "--sort=-committerdate",
+            "refs/remotes/",
+            "--format=%(refname:short)|%(committerdate:unix)"
+        ).mapNotNull { line ->
+            val parts = line.split("|")
+            if (parts.size < 2) return@mapNotNull null
+            val name = parts[0].trim()
+            val epoch = parts[1].trim().toLongOrNull() ?: return@mapNotNull null
+            name.takeIf { epoch >= cutoff && !it.endsWith("/HEAD") }
+        }
+    }
+
+    fun detectDefaultBranch(): String? {
+        val active = getActiveBranches(365)
+        return DEFAULT_BRANCH_CANDIDATES.firstOrNull { it in active }
+            ?: active.firstOrNull { it.startsWith("origin/") }
+    }
 
     fun refresh() {
         terminal.exec("git", "fetch")

@@ -12,16 +12,18 @@ class MarkAsMigrationRootAction : AnAction() {
     override fun update(e: AnActionEvent) {
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
         val settings = e.project?.let { ProjectSettings.getInstance(it) }
+        val rel = e.project?.let { file?.let { f -> relativePath(it, f) } }
         e.presentation.isEnabledAndVisible = e.project != null
             && file != null
             && file.isDirectory
-            && settings?.migrationRootPath != relativePath(e.project!!, file)
+            && rel != null
+            && settings?.migrationRootPaths?.contains(rel) == false
     }
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
-        ProjectSettings.getInstance(project).migrationRootPath = relativePath(project, file)
+        ProjectSettings.getInstance(project).addRoot(relativePath(project, file))
     }
 
     private fun relativePath(project: Project, file: VirtualFile): String {

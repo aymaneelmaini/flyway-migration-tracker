@@ -1,6 +1,6 @@
 package com.aymaneelmaini.flywaytracker.toolwindow
 
-import com.aymaneelmaini.flywaytracker.entities.FlywayMigrationFile
+import com.aymaneelmaini.flywaytracker.entities.MigrationVersionComparator
 import com.aymaneelmaini.flywaytracker.services.FlywayMigrationService
 import com.aymaneelmaini.flywaytracker.settings.ProjectSettings
 import com.intellij.openapi.project.Project
@@ -33,18 +33,12 @@ class MigrationTrackerToolWindowFactory : ToolWindowFactory {
 
         private lateinit var contentPanel: JBPanel<*>
 
-        private fun buildTopBar(): JComponent {
-            val bar = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+        private fun buildTopBar(): JComponent =
+            JBPanel<JBPanel<*>>(BorderLayout()).apply {
                 border = JBUI.Borders.empty(6, 8)
+                add(JBLabel("<html><b>Flyway Version Tracker</b></html>"), BorderLayout.WEST)
+                add(JButton("⟳ Refresh").apply { addActionListener { refresh() } }, BorderLayout.EAST)
             }
-            val title = JBLabel("<html><b>Flyway Version Tracker</b></html>")
-            val refreshBtn = JButton("⟳ Refresh").apply {
-                addActionListener { refresh() }
-            }
-            bar.add(title, BorderLayout.WEST)
-            bar.add(refreshBtn, BorderLayout.EAST)
-            return bar
-        }
 
         private fun buildScrollableContent(): JComponent {
             contentPanel = JBPanel<JBPanel<*>>().apply {
@@ -68,45 +62,35 @@ class MigrationTrackerToolWindowFactory : ToolWindowFactory {
             val service = FlywayMigrationService.getInstance(project)
 
             if (!settings.isConfigured) {
-                contentPanel.add(warn("No migration root configured.\nRight-click a folder → Mark as Migrations Root"))
+                contentPanel.add(warn("No migration roots configured.\nWill auto-detect on next project open,\nor right-click a folder → Mark as Migrations Root"))
                 return
             }
 
-            contentPanel.add(info("Migration Root: ${settings.migrationRootPath}"))
-            contentPanel.add(info("Sync Branch: ${settings.syncBranch.ifBlank { "(not configured)" }}"))
-            contentPanel.add(Box.createVerticalStrut(8))
+            val branchLabel = settings.syncBranch.ifBlank { "all active branches (last 30 days)" }
+            contentPanel.add(info("Checking: $branchLabel"))
+            contentPanel.add(Box.createVerticalStrut(6))
 
-            val local = service.getLocalMigrations()
-            val remote = service.getRemoteMigrations()
+            settings.migrationRootPaths.forEach { root ->
+                val local = service.getLocalMigrations(root)
+                val remote = service.getRemoteMigrations(root)
+                val conflicts = local.filter { m -> remote.any { it.conflictsWith(m) } }
+                val next = service.getNextVersion(root)
+                val label = root.substringAfterLast("/").ifBlank { root }
 
-            contentPanel.add(sectionLabel("Local Migrations (${local.size})"))
-            if (local.isEmpty()) {
-                contentPanel.add(info("  (none)"))
-            } else {
-                local.sortedWith(Comparator { a, b ->
-                    com.aymaneelmaini.flywaytracker.entities.MigrationVersionComparator.compare(a.version, b.version)
-                }).forEach { m ->
-                    val isConflict = remote.any { it.conflictsWith(m) }
-                    contentPanel.add(migrationRow(m, isConflict))
-                }
-            }
+                contentPanel.add(sectionLabel("$label  —  next: $next${if (conflicts.isNotEmpty()) "  ⚠ ${conflicts.size} conflict(s)" else ""}"))
+                contentPanel.add(info("  Path: $root"))
 
-            contentPanel.add(Box.createVerticalStrut(8))
-
-            if (settings.syncBranch.isNotBlank()) {
-                contentPanel.add(sectionLabel("Remote (${settings.syncBranch}) — ${remote.size} migrations"))
-                if (remote.isEmpty()) {
-                    contentPanel.add(info("  (none or branch not fetched)"))
+                if (local.isEmpty()) {
+                    contentPanel.add(info("  (no local migrations)"))
                 } else {
-                    remote.sortedWith(Comparator { a, b ->
-                        com.aymaneelmaini.flywaytracker.entities.MigrationVersionComparator.compare(a.version, b.version)
-                    }).forEach { m -> contentPanel.add(info("  ${m.prefix}${m.version}__ — ${m.description}.${m.extension}")) }
+                    local.sortedWith(Comparator { a, b -> MigrationVersionComparator.compare(a.version, b.version) })
+                        .forEach { m ->
+                            val isConflict = remote.any { it.conflictsWith(m) }
+                            contentPanel.add(migrationRow(m, isConflict))
+                        }
                 }
-                contentPanel.add(Box.createVerticalStrut(8))
+                contentPanel.add(Box.createVerticalStrut(10))
             }
-
-            val next = service.getNextVersion()
-            contentPanel.add(sectionLabel("Next safe version: $next"))
         }
 
         private fun info(text: String): JComponent = JBLabel(text).apply {
@@ -114,19 +98,21 @@ class MigrationTrackerToolWindowFactory : ToolWindowFactory {
             border = JBUI.Borders.emptyBottom(2)
         }
 
-        private fun warn(text: String): JComponent = JBLabel("<html>${text.replace("\n", "<br>")}</html>").apply {
-            foreground = JBUI.CurrentTheme.Label.disabledForeground()
-            alignmentX = Component.LEFT_ALIGNMENT
-        }
+        private fun warn(text: String): JComponent =
+            JBLabel("<html>${text.replace("\n", "<br>")}</html>").apply {
+                foreground = JBUI.CurrentTheme.Label.disabledForeground()
+                alignmentX = Component.LEFT_ALIGNMENT
+            }
 
-        private fun sectionLabel(text: String): JComponent = JBLabel("<html><b>$text</b></html>").apply {
-            alignmentX = Component.LEFT_ALIGNMENT
-            border = JBUI.Borders.emptyBottom(4)
-        }
+        private fun sectionLabel(text: String): JComponent =
+            JBLabel("<html><b>$text</b></html>").apply {
+                alignmentX = Component.LEFT_ALIGNMENT
+                border = JBUI.Borders.emptyBottom(2)
+            }
 
-        private fun migrationRow(m: FlywayMigrationFile, conflict: Boolean): JComponent {
-            val marker = if (conflict) " <font color='red'>⚠ CONFLICT with remote</font>" else ""
-            return JBLabel("<html>  ${m.prefix}${m.version}__ — ${m.description}.${m.extension}$marker</html>").apply {
+        private fun migrationRow(m: com.aymaneelmaini.flywaytracker.entities.FlywayMigrationFile, conflict: Boolean): JComponent {
+            val suffix = if (conflict) " <font color='red'>⚠ conflict</font>" else ""
+            return JBLabel("<html>  ${m.prefix}${m.version}__ ${m.description}.${m.extension}$suffix</html>").apply {
                 alignmentX = Component.LEFT_ALIGNMENT
                 border = JBUI.Borders.emptyBottom(2)
             }
