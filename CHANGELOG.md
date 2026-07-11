@@ -2,11 +2,12 @@
 
 # Flyway-version-tracker Changelog
 
-## [Unreleased]
+## Unreleased
 
-## [1.0.0] - 2026-07-11
+## 1.0.0 - 2026-07-11
 
 ### Added
+
 - Flyway version conflict detection — blocks commits with duplicate migration versions
 - Tool window showing local vs remote migrations with conflict highlights
 - Auto-suggested next migration version when creating a new migration file
