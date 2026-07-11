@@ -16,7 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
     steps:
 
       - name: Fetch Sources
@@ -44,26 +43,13 @@ jobs:
       - name: Patch Changelog
         run: ./gradlew patchChangelog
 
-      - name: Create Changelog Pull Request
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit Updated Changelog
         run: |
-          VERSION="${{ github.ref_name }}"
-          BRANCH="changelog-update-$VERSION"
-
           git config user.email "action@github.com"
           git config user.name "GitHub Actions"
-
-          git checkout -b $BRANCH
           git add CHANGELOG.md
-          git diff --cached --quiet || git commit -m "chore: patch changelog for $VERSION"
-          git push --set-upstream origin $BRANCH
-
-          gh pr create \
-            --title "Changelog update - \`$VERSION\`" \
-            --body "Patched \`CHANGELOG.md\` for \`$VERSION\`." \
-            --head $BRANCH \
-            --base master
+          git diff --cached --quiet || git commit -m "chore: patch changelog for ${{ github.ref_name }}"
+          git push origin HEAD:master
 
       - name: Publish GitHub Release
         env:
