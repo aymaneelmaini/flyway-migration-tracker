@@ -16,6 +16,8 @@ class MigrationVersionCheckinHandlerFactory : CheckinHandlerFactory() {
         MigrationVersionCheckinHandler(panel)
 }
 
+private data class MigrationConflict(val migration: FlywayMigrationFile, val root: String)
+
 class MigrationVersionCheckinHandler(
     private val panel: CheckinProjectPanel
 ) : CheckinHandler() {
@@ -30,24 +32,24 @@ class MigrationVersionCheckinHandler(
 
         val service = FlywayMigrationService.getInstance(project)
 
-        // Group staged migration files by their root, then check each root independently
-        data class Conflict(val migration: FlywayMigrationFile, val root: String)
-
         val conflicts = panel.virtualFiles.mapNotNull { vFile ->
             val root = service.findRootFor(vFile.path) ?: return@mapNotNull null
             val migration = FlywayMigrationFile.from(vFile.name) ?: return@mapNotNull null
-            if (service.isVersionUsedOnRemote(migration.version, root, migration.prefix))
-                Conflict(migration, root)
-            else null
+            MigrationConflict(migration, root).takeIf {
+                service.isVersionUsedOnRemote(migration.version, root, migration.prefix)
+            }
         }
 
         if (conflicts.isEmpty()) return ReturnResult.COMMIT
 
-        val list = conflicts.joinToString("\n") { "  • [${it.root.substringAfterLast('/')}] ${it.migration.rawFileName}" }
-        val suggestions = conflicts.distinctBy { it.root }
-            .joinToString("\n") { "  ${it.root.substringAfterLast('/')}: ${service.getNextVersion(it.root)}" }
+        val list = conflicts.joinToString("\n") {
+            "  • [${it.root.substringAfterLast('/')}] ${it.migration.rawFileName}"
+        }
+        val suggestions = conflicts.distinctBy { it.root }.joinToString("\n") {
+            "  ${it.root.substringAfterLast('/')}: ${service.getNextVersion(it.root)}"
+        }
 
-        val choice = Messages.showYesNoDialog(
+        val abort = Messages.showYesNoDialog(
             project,
             "The following migration(s) conflict with active remote branches:\n\n$list\n\nNext safe versions:\n$suggestions\n\nAbort the commit to fix?",
             "Migration Version Conflict",
@@ -56,6 +58,6 @@ class MigrationVersionCheckinHandler(
             Messages.getWarningIcon()
         )
 
-        return if (choice == Messages.YES) ReturnResult.CANCEL else ReturnResult.COMMIT
+        return if (abort == Messages.YES) ReturnResult.CANCEL else ReturnResult.COMMIT
     }
 }

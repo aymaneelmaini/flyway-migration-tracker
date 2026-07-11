@@ -1,6 +1,6 @@
 package com.aymaneelmaini.flywaytracker.toolwindow
 
-import com.aymaneelmaini.flywaytracker.entities.MigrationVersionComparator
+import com.aymaneelmaini.flywaytracker.entities.FlywayMigrationFile
 import com.aymaneelmaini.flywaytracker.services.FlywayMigrationService
 import com.aymaneelmaini.flywaytracker.settings.ProjectSettings
 import com.intellij.openapi.project.Project
@@ -24,7 +24,7 @@ class MigrationTrackerToolWindowFactory : ToolWindowFactory {
         toolWindow.contentManager.addContent(content)
     }
 
-    class MigrationTrackerPanel(private val project: Project) {
+    private class MigrationTrackerPanel(private val project: Project) {
 
         val root: JComponent = JBPanel<JBPanel<*>>(BorderLayout()).apply {
             add(buildTopBar(), BorderLayout.NORTH)
@@ -73,21 +73,20 @@ class MigrationTrackerToolWindowFactory : ToolWindowFactory {
             settings.migrationRootPaths.forEach { root ->
                 val local = service.getLocalMigrations(root)
                 val remote = service.getRemoteMigrations(root)
-                val conflicts = local.filter { m -> remote.any { it.conflictsWith(m) } }
-                val next = service.getNextVersion(root)
+                val next = service.nextVersionFrom(local + remote)
+                val conflictCount = local.count { m -> remote.any { it.conflictsWith(m) } }
                 val label = root.substringAfterLast("/").ifBlank { root }
+                val conflictSuffix = if (conflictCount > 0) "  ⚠ $conflictCount conflict(s)" else ""
 
-                contentPanel.add(sectionLabel("$label  —  next: $next${if (conflicts.isNotEmpty()) "  ⚠ ${conflicts.size} conflict(s)" else ""}"))
+                contentPanel.add(sectionLabel("$label  —  next: $next$conflictSuffix"))
                 contentPanel.add(info("  Path: $root"))
 
                 if (local.isEmpty()) {
                     contentPanel.add(info("  (no local migrations)"))
                 } else {
-                    local.sortedWith(Comparator { a, b -> MigrationVersionComparator.compare(a.version, b.version) })
-                        .forEach { m ->
-                            val isConflict = remote.any { it.conflictsWith(m) }
-                            contentPanel.add(migrationRow(m, isConflict))
-                        }
+                    local.sortedBy { it.version }.forEach { m ->
+                        contentPanel.add(migrationRow(m, isConflict = remote.any { it.conflictsWith(m) }))
+                    }
                 }
                 contentPanel.add(Box.createVerticalStrut(10))
             }
@@ -110,8 +109,8 @@ class MigrationTrackerToolWindowFactory : ToolWindowFactory {
                 border = JBUI.Borders.emptyBottom(2)
             }
 
-        private fun migrationRow(m: com.aymaneelmaini.flywaytracker.entities.FlywayMigrationFile, conflict: Boolean): JComponent {
-            val suffix = if (conflict) " <font color='red'>⚠ conflict</font>" else ""
+        private fun migrationRow(m: FlywayMigrationFile, isConflict: Boolean): JComponent {
+            val suffix = if (isConflict) " <font color='red'>⚠ conflict</font>" else ""
             return JBLabel("<html>  ${m.prefix}${m.version}__ ${m.description}.${m.extension}$suffix</html>").apply {
                 alignmentX = Component.LEFT_ALIGNMENT
                 border = JBUI.Borders.emptyBottom(2)

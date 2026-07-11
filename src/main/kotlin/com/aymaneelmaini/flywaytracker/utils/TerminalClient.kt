@@ -18,15 +18,4 @@ class TerminalClient(private val workingDir: String) {
             emptyList()
         }
     }
-
-    fun execVoid(vararg args: String) {
-        if (workingDir.isBlank()) return
-        try {
-            ProcessBuilder(args.toList())
-                .directory(File(workingDir))
-                .start()
-        } catch (_: Exception) {
-            // fire and forget
-        }
-    }
 }

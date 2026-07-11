@@ -1,5 +1,7 @@
 package com.aymaneelmaini.flywaytracker.entities
 
+private val VALID_PREFIXES = setOf('V', 'U', 'R')
+
 data class FlywayMigrationFile(
     val prefix: Char,
     val version: MigrationVersion,
@@ -10,23 +12,18 @@ data class FlywayMigrationFile(
     companion object {
         fun from(path: String): FlywayMigrationFile? {
             val name = path.substringAfterLast("/").substringAfterLast("\\")
-            if (name.length < 5) return null
-            val prefix = name[0]
-            if (prefix !in listOf('V', 'U', 'R')) return null
-            val separatorIndex = name.indexOf("__")
-            if (separatorIndex < 2) return null
-            val versionStr = name.substring(1, separatorIndex)
-            val version = MigrationVersion.parse(versionStr) ?: return null
-            val afterSeparator = name.substring(separatorIndex + 2)
-            val lastDot = afterSeparator.lastIndexOf('.')
-            if (lastDot < 0) return null
-            val description = afterSeparator.substring(0, lastDot)
-            val extension = afterSeparator.substring(lastDot + 1)
+            val prefix = name.firstOrNull() ?: return null
+            if (prefix !in VALID_PREFIXES) return null
+            val sep = name.indexOf("__").takeIf { it >= 2 } ?: return null
+            val version = MigrationVersion.parse(name.substring(1, sep)) ?: return null
+            val rest = name.substring(sep + 2)
+            val dot = rest.lastIndexOf('.')
+            if (dot < 0) return null
+            val description = rest.substring(0, dot)
+            val extension = rest.substring(dot + 1)
             if (description.isBlank() || extension.isBlank()) return null
             return FlywayMigrationFile(prefix, version, description, extension, name)
         }
-
-        fun isValidName(name: String): Boolean = from(name) != null
     }
 
     fun conflictsWith(other: FlywayMigrationFile): Boolean =

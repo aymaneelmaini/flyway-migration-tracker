@@ -2,7 +2,6 @@ package com.aymaneelmaini.flywaytracker.services
 
 import com.aymaneelmaini.flywaytracker.entities.FlywayMigrationFile
 import com.aymaneelmaini.flywaytracker.entities.MigrationVersion
-import com.aymaneelmaini.flywaytracker.entities.MigrationVersionComparator
 import com.aymaneelmaini.flywaytracker.settings.ProjectSettings
 import com.aymaneelmaini.flywaytracker.utils.TerminalClient
 import com.intellij.openapi.components.Service
@@ -26,7 +25,7 @@ class FlywayMigrationService(private val project: Project) {
         val untracked = terminal.exec("git", "ls-files", "-o", "--exclude-standard", root)
         return (tracked + untracked)
             .mapNotNull { FlywayMigrationFile.from(it) }
-            .distinctBy { "${it.prefix}${it.version}" }
+            .distinctBy { it.prefix to it.version }
     }
 
     fun getRemoteMigrations(root: String): List<FlywayMigrationFile> {
@@ -36,52 +35,41 @@ class FlywayMigrationService(private val project: Project) {
                 terminal.exec("git", "ls-tree", "-r", "--name-only", branch, root)
                     .mapNotNull { FlywayMigrationFile.from(it) }
             }
-            .distinctBy { "${it.prefix}${it.version}" }
+            .distinctBy { it.prefix to it.version }
     }
 
-    fun getAllMigrations(root: String): List<FlywayMigrationFile> =
-        (getLocalMigrations(root) + getRemoteMigrations(root))
-            .distinctBy { "${it.prefix}${it.version}" }
+    fun getNextVersion(root: String): String =
+        nextVersionFrom(getLocalMigrations(root) + getRemoteMigrations(root))
 
-    fun getNextVersion(root: String): String {
-        val versioned = getAllMigrations(root).filter { it.prefix == 'V' }
-        if (versioned.isEmpty()) return "V1__"
-        val max = versioned.maxWithOrNull { a, b ->
-            MigrationVersionComparator.compare(a.version, b.version)
-        }?.version ?: return "V1__"
-        return "V${max.next()}__"
+    /** Compute next version from an already-fetched list — avoids redundant git calls. */
+    fun nextVersionFrom(migrations: List<FlywayMigrationFile>): String {
+        val max = migrations.filter { it.prefix == 'V' }.maxByOrNull { it.version }?.version
+        return if (max != null) "V${max.next()}__" else "V1__"
     }
 
     fun isVersionUsed(version: MigrationVersion, root: String, prefix: Char = 'V'): Boolean =
-        getAllMigrations(root).any { it.prefix == prefix && it.version == version }
+        (getLocalMigrations(root) + getRemoteMigrations(root)).any { it.prefix == prefix && it.version == version }
 
     fun isVersionUsedOnRemote(version: MigrationVersion, root: String, prefix: Char = 'V'): Boolean =
         getRemoteMigrations(root).any { it.prefix == prefix && it.version == version }
 
     // ── multi-root helpers ────────────────────────────────────────────────────
 
-    /** Returns which configured root a file path belongs to, or null if none. */
     fun findRootFor(filePath: String): String? {
         val normalized = filePath.replace("\\", "/")
-        return settings.migrationRootPaths.firstOrNull { root ->
-            normalized.contains(root.replace("\\", "/"))
-        }
+        return settings.migrationRootPaths.firstOrNull { normalized.contains(it.replace("\\", "/")) }
     }
 
     // ── discovery ─────────────────────────────────────────────────────────────
 
-    /** Scan git-tracked files for all directories containing Flyway migrations,
-     *  excluding build output directories. Returns project-relative paths. */
-    fun detectMigrationRoots(): List<String> {
-        return terminal.exec("git", "ls-files")
+    fun detectMigrationRoots(): List<String> =
+        terminal.exec("git", "ls-files")
             .filter { path -> MIGRATION_FILE_REGEX.matches("/$path") }
             .filter { path -> EXCLUDED_DIRS.none { exc -> path.split("/").contains(exc) } }
             .map { it.substringBeforeLast("/") }
             .filter { it.isNotBlank() }
             .distinct()
-    }
 
-    /** Only branches with commits within the last [withinDays] days. */
     fun getActiveBranches(withinDays: Long = ACTIVE_BRANCH_DAYS): List<String> {
         val cutoff = (System.currentTimeMillis() / 1000L) - (withinDays * 86_400L)
         return terminal.exec(
