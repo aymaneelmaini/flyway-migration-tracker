@@ -1,8 +1,8 @@
 package com.aymaneelmaini.flywaytracker.checkin
 
-import com.aymaneelmaini.flywaytracker.entities.FlywayMigrationFile
-import com.aymaneelmaini.flywaytracker.services.FlywayMigrationService
-import com.aymaneelmaini.flywaytracker.settings.ProjectSettings
+import com.aymaneelmaini.flywaytracker.entity.FlywayMigrationFile
+import com.aymaneelmaini.flywaytracker.service.FlywayMigrationService
+import com.aymaneelmaini.flywaytracker.setting.ProjectSettings
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.CheckinProjectPanel
 import com.intellij.openapi.vcs.changes.CommitContext

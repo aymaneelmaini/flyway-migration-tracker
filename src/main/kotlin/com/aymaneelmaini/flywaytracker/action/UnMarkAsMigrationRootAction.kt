@@ -1,10 +1,10 @@
-package com.aymaneelmaini.flywaytracker.actions
+package com.aymaneelmaini.flywaytracker.action
 
-import com.aymaneelmaini.flywaytracker.settings.ProjectSettings
-import com.aymaneelmaini.flywaytracker.utils.relativePathIn
+import com.aymaneelmaini.flywaytracker.setting.ProjectSettings
+import com.aymaneelmaini.flywaytracker.util.relativePathIn
 import com.intellij.openapi.actionSystem.*
 
-class MarkAsMigrationRootAction : AnAction() {
+class UnMarkAsMigrationRootAction : AnAction() {
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
@@ -13,12 +13,12 @@ class MarkAsMigrationRootAction : AnAction() {
         val project = e.project ?: return
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE)?.takeIf { it.isDirectory } ?: return
         e.presentation.isEnabledAndVisible =
-            !ProjectSettings.getInstance(project).migrationRootPaths.contains(file.relativePathIn(project))
+            ProjectSettings.getInstance(project).migrationRootPaths.contains(file.relativePathIn(project))
     }
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
-        ProjectSettings.getInstance(project).addRoot(file.relativePathIn(project))
+        ProjectSettings.getInstance(project).removeRoot(file.relativePathIn(project))
     }
 }

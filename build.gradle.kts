@@ -6,15 +6,17 @@ plugins {
     id("org.jetbrains.intellij.platform")
 }
 
-// Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
-    testImplementation(libs.junit)
+    testImplementation(libs.kotest.runner.junit5)
+    testImplementation(libs.kotest.assertions.core)
+    testImplementation(libs.kotest.property)
 
-    // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
         intellijIdea("2025.3.5")
         testFramework(TestFrameworkType.Platform)
-
-
     }
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

@@ -1,8 +1,8 @@
 package com.aymaneelmaini.flywaytracker.startup
 
-import com.aymaneelmaini.flywaytracker.services.FlywayMigrationService
-import com.aymaneelmaini.flywaytracker.settings.ProjectSettings
-import com.aymaneelmaini.flywaytracker.utils.Notifier
+import com.aymaneelmaini.flywaytracker.service.FlywayMigrationService
+import com.aymaneelmaini.flywaytracker.setting.ProjectSettings
+import com.aymaneelmaini.flywaytracker.util.Notifier
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import kotlinx.coroutines.Dispatchers

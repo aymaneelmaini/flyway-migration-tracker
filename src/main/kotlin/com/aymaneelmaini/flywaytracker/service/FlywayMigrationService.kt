@@ -1,9 +1,9 @@
-package com.aymaneelmaini.flywaytracker.services
+package com.aymaneelmaini.flywaytracker.service
 
-import com.aymaneelmaini.flywaytracker.entities.FlywayMigrationFile
-import com.aymaneelmaini.flywaytracker.entities.MigrationVersion
-import com.aymaneelmaini.flywaytracker.settings.ProjectSettings
-import com.aymaneelmaini.flywaytracker.utils.TerminalClient
+import com.aymaneelmaini.flywaytracker.entity.FlywayMigrationFile
+import com.aymaneelmaini.flywaytracker.entity.MigrationVersion
+import com.aymaneelmaini.flywaytracker.setting.ProjectSettings
+import com.aymaneelmaini.flywaytracker.util.TerminalClient
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 

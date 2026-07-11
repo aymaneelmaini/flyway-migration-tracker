@@ -1,4 +1,4 @@
-package com.aymaneelmaini.flywaytracker.settings
+package com.aymaneelmaini.flywaytracker.setting
 
 import com.intellij.openapi.components.*
 import com.intellij.openapi.project.Project

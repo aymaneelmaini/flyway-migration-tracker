@@ -1,8 +1,8 @@
 package com.aymaneelmaini.flywaytracker.toolwindow
 
-import com.aymaneelmaini.flywaytracker.entities.FlywayMigrationFile
-import com.aymaneelmaini.flywaytracker.services.FlywayMigrationService
-import com.aymaneelmaini.flywaytracker.settings.ProjectSettings
+import com.aymaneelmaini.flywaytracker.entity.FlywayMigrationFile
+import com.aymaneelmaini.flywaytracker.service.FlywayMigrationService
+import com.aymaneelmaini.flywaytracker.setting.ProjectSettings
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory

@@ -1,7 +1,7 @@
-package com.aymaneelmaini.flywaytracker.actions
+package com.aymaneelmaini.flywaytracker.action
 
-import com.aymaneelmaini.flywaytracker.services.FlywayMigrationService
-import com.aymaneelmaini.flywaytracker.utils.Notifier
+import com.aymaneelmaini.flywaytracker.service.FlywayMigrationService
+import com.aymaneelmaini.flywaytracker.util.Notifier
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager

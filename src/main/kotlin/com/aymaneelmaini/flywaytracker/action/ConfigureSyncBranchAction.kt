@@ -1,7 +1,7 @@
-package com.aymaneelmaini.flywaytracker.actions
+package com.aymaneelmaini.flywaytracker.action
 
-import com.aymaneelmaini.flywaytracker.services.FlywayMigrationService
-import com.aymaneelmaini.flywaytracker.settings.ProjectSettings
+import com.aymaneelmaini.flywaytracker.service.FlywayMigrationService
+import com.aymaneelmaini.flywaytracker.setting.ProjectSettings
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.ui.Messages
 

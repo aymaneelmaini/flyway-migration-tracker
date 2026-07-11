@@ -1,4 +1,4 @@
-package com.aymaneelmaini.flywaytracker.utils
+package com.aymaneelmaini.flywaytracker.util
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile

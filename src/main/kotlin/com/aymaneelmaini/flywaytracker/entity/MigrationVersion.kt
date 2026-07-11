@@ -1,4 +1,4 @@
-package com.aymaneelmaini.flywaytracker.entities
+package com.aymaneelmaini.flywaytracker.entity
 
 data class MigrationVersion(val parts: List<Int>) : Comparable<MigrationVersion> {
 

@@ -21,8 +21,8 @@
         <notificationGroup id="Flyway Version Tracker"
                            displayType="BALLOON"/>
 
-        <projectService serviceImplementation="com.aymaneelmaini.flywaytracker.settings.ProjectSettings"/>
-        <projectService serviceImplementation="com.aymaneelmaini.flywaytracker.services.FlywayMigrationService"/>
+        <projectService serviceImplementation="com.aymaneelmaini.flywaytracker.setting.ProjectSettings"/>
+        <projectService serviceImplementation="com.aymaneelmaini.flywaytracker.service.FlywayMigrationService"/>
 
         <toolWindow id="Flyway Tracker"
                     anchor="right"
@@ -40,7 +40,7 @@
 
         <!-- New Migration: appears under New File menu -->
         <action id="flyway.tracker.createMigration"
-                class="com.aymaneelmaini.flywaytracker.actions.CreateMigrationAction"
+                class="com.aymaneelmaini.flywaytracker.action.CreateMigrationAction"
                 text="New Migration"
                 description="Create a new Flyway migration file with auto-suggested version">
             <add-to-group group-id="NewGroup" anchor="after" relative-to-action="NewFile"/>
@@ -48,14 +48,14 @@
 
         <!-- Mark / unmark migration root: appears in directory context menu -->
         <action id="flyway.tracker.markAsRoot"
-                class="com.aymaneelmaini.flywaytracker.actions.MarkAsMigrationRootAction"
+                class="com.aymaneelmaini.flywaytracker.action.MarkAsMigrationRootAction"
                 text="Migrations Root"
                 description="Mark this directory as the Flyway migrations root">
             <add-to-group group-id="MarkRootGroup" anchor="last"/>
         </action>
 
         <action id="flyway.tracker.unmarkRoot"
-                class="com.aymaneelmaini.flywaytracker.actions.UnMarkAsMigrationRootAction"
+                class="com.aymaneelmaini.flywaytracker.action.UnMarkAsMigrationRootAction"
                 text="Unmark as Migrations Root"
                 description="Remove migrations root designation from this directory">
             <add-to-group group-id="MarkRootGroup" anchor="last"/>
@@ -68,12 +68,12 @@
                popup="true">
 
             <action id="flyway.tracker.configureBranch"
-                    class="com.aymaneelmaini.flywaytracker.actions.ConfigureSyncBranchAction"
+                    class="com.aymaneelmaini.flywaytracker.action.ConfigureSyncBranchAction"
                     text="Configure Sync Branch"
                     description="Select the remote branch to check for migration version conflicts"/>
 
             <action id="flyway.tracker.refresh"
-                    class="com.aymaneelmaini.flywaytracker.actions.RefreshMigrationsAction"
+                    class="com.aymaneelmaini.flywaytracker.action.RefreshMigrationsAction"
                     text="Refresh Migrations"
                     description="Fetch remote and reload migration data"/>
 

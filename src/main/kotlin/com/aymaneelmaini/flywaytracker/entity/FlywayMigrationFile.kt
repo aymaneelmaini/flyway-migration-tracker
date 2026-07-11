@@ -1,4 +1,4 @@
-package com.aymaneelmaini.flywaytracker.entities
+package com.aymaneelmaini.flywaytracker.entity
 
 private val VALID_PREFIXES = setOf('V', 'U', 'R')
 
